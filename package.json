@@ -1,0 +1,31 @@
+{
+  "name": "radi-fetch",
+  "version": "0.3.20",
+  "main": "dist/radi-fetch.js",
+  "module": "src/index.js",
+  "jsnext:main": "dist/radi-fetch.es.js",
+  "license": "MIT",
+  "repository": "radi-js/radi-fetch",
+  "author": "Marcis Bergmanis <marcisbergmanis@gmail.com>",
+  "keywords": [
+    "radi",
+    "radi-fetch",
+    "javascript",
+    "fetch",
+    "http"
+  ],
+  "scripts": {
+    "prod": "npm run build",
+    "build": "npm run roll && npm run min",
+    "roll": "npm run roll-es && npm run roll-js",
+    "roll-es": "rollup -c -n radi-fetch -f es -i src/index.js -o dist/radi-fetch.es.js -m",
+    "roll-js": "rollup -c -n radi-fetch -f umd -i src/index.js -o dist/radi-fetch.js -m",
+    "min": "npm run min-js && npm run min-es",
+    "min-js": "google-closure-compiler-js dist/radi-fetch.js > dist/radi-fetch.min.js",
+    "min-es": "squash dist/radi-fetch.es.js -o dist/radi-fetch.es.min.js"
+  },
+  "devDependencies": {
+    "butternut": "^0.4.6",
+    "google-closure-compiler-js": "^20180204.0.0"
+  }
+}

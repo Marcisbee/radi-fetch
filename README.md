@@ -91,7 +91,7 @@ class MyComponent extends Radi.Component {
   view() {
     return (
       <ul>
-        <li>/api is { this.$loading.state['/api'] ? 'loading' ? 'ready' }</li>
+        <li>/api is { this.$loading.state['/api'] ? 'loading' : 'ready' }</li>
         <li>Number of active requests: { this.$loading.state.$count }</li>
         <li>Anything loading: { this.$loading.state.$any }</li>
       </ul>

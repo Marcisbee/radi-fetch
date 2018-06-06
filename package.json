@@ -1,6 +1,6 @@
 {
   "name": "radi-fetch",
-  "version": "0.3.20",
+  "version": "0.3.21",
   "main": "dist/radi-fetch.js",
   "module": "src/index.js",
   "jsnext:main": "dist/radi-fetch.es.js",

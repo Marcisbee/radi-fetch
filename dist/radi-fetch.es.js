@@ -1,4 +1,4 @@
-const version = '0.3.20';
+const version = '0.3.21';
 
 // Pass config to initiate things
 var index = ({
@@ -18,9 +18,10 @@ var index = ({
   };
 
   let HTTP = function HTTP(t, url, params, headers, loading) {
-    this.id = url;
-    loading.start(url);
+    this.url = url;
+    this.id = url + '';
     this.type = t;
+    this.start = () => loading.start(this.id);
     this.end = () => loading.end(this.id);
     this.http = new XMLHttpRequest();
     this.headers = Object.assign(config.headers, headers);
@@ -48,6 +49,7 @@ var index = ({
 
     // Allows to abort request
     this.abort = (...args) => this.http.abort(...args);
+    this.tag = key => (this.id = key, this);
   };
 
   HTTP.prototype.catch = function (ERR) {
@@ -61,6 +63,7 @@ var index = ({
   };
 
   HTTP.prototype.then = function then(OK, ERR) {
+    this.start();
     this.resolve = (...args) => {
       OK(...args);
       this.end();
@@ -72,7 +75,7 @@ var index = ({
       };
     }
     if (dummy) {
-      fetchdummy(this.type, this.id, data => {
+      fetchdummy(this.type, this.url, data => {
         this.resolve({
           headers: '',
           status: 'dummy',

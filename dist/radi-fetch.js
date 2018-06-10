@@ -4,7 +4,7 @@
 	(factory((global['radi-fetch'] = {})));
 }(this, (function (exports) { 'use strict';
 
-const version = '0.3.21';
+const version = '0.3.22';
 
 // Pass config to initiate things
 var index = ({
@@ -30,7 +30,7 @@ var index = ({
     this.start = () => loading.start(this.id);
     this.end = () => loading.end(this.id);
     this.http = new XMLHttpRequest();
-    this.headers = Object.assign(config.headers, headers);
+    this.headers = Object.assign(config.headers || {}, headers || {});
     this.params = JSON.stringify(params);
     this.resolve = () => {
       this.end();
@@ -70,10 +70,12 @@ var index = ({
 
   HTTP.prototype.then = function then(OK, ERR) {
     this.start();
-    this.resolve = (...args) => {
-      OK(...args);
-      this.end();
-    };
+    if (typeof OK === 'function') {
+      this.resolve = (...args) => {
+        OK(...args);
+        this.end();
+      };
+    }
     if (typeof ERR === 'function') {
       this.reject = (...args) => {
         ERR(...args);
@@ -124,11 +126,11 @@ var index = ({
 
   class Fetch extends Component {
     get(u, p, h) { return new HTTP('get', u, p, h, this.$loading) }
-    post(u, p, h) { return new HTTP('post', u, p, h) }
-    put(u, p, h) { return new HTTP('put', u, p, h) }
-    delete(u, p, h) { return new HTTP('delete', u, p, h) }
-    options(u, p, h) { return new HTTP('options', u, p, h) }
-    head(u, p, h) { return new HTTP('head', u, p, h) }
+    post(u, p, h) { return new HTTP('post', u, p, h, this.$loading) }
+    put(u, p, h) { return new HTTP('put', u, p, h, this.$loading) }
+    delete(u, p, h) { return new HTTP('delete', u, p, h, this.$loading) }
+    options(u, p, h) { return new HTTP('options', u, p, h, this.$loading) }
+    head(u, p, h) { return new HTTP('head', u, p, h, this.$loading) }
   }
 
   class Loading extends Component {

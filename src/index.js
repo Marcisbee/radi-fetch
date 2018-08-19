@@ -1,4 +1,4 @@
-export const version = '0.3.22';
+export const version = '0.3.23';
 
 // Pass config to initiate things
 export default ({
@@ -9,15 +9,17 @@ export default ({
     Component,
   }, config = {}) => {
   let prefix = (config.baseUrl || '').replace(/\/$/, '');
-  let dummy = config.dummy && (config.dummyData || {});
+  let dummy = config.dummy;
+  let dummyData = config.dummyData || {};
 
   let fetchdummy = (type, key, cb) => {
     setTimeout(() => {
-      cb(dummy[type] && dummy[type][key] || null)
+      cb(dummyData[type] && dummyData[type][key] || null)
     }, config.dummyTimeout || 100)
   }
 
   let HTTP = function HTTP(t, url, params, headers, loading) {
+    this.localDummy = config.dummy
     this.url = url
     this.id = url + ''
     this.type = t
@@ -52,6 +54,11 @@ export default ({
     this.tag = key => (this.id = key, this)
   }
 
+  HTTP.prototype.dummy = function (status = true) {
+    this.localDummy = status;
+    return this
+  }
+
   HTTP.prototype.catch = function (ERR) {
     if (typeof ERR === 'function') {
       this.reject = (...args) => {
@@ -76,7 +83,7 @@ export default ({
         this.end()
       };
     }
-    if (dummy) {
+    if (this.localDummy || dummy) {
       fetchdummy(this.type, this.url, data => {
         this.resolve({
           headers: '',

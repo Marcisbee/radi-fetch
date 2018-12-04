@@ -1,105 +1,82 @@
-const version = '0.3.23';
+var version = '0.5.0';
 
 // Pass config to initiate things
-var index = ({
-    r,
-    l,
-    mount,
-    headless,
-    Component,
-  }, config = {}) => {
-  let prefix = (config.baseUrl || '').replace(/\/$/, '');
-  let dummy = config.dummy;
-  let dummyData = config.dummyData || {};
+var RadiFetch = function (_radi, config) {
+  if ( config === void 0 ) config = {};
 
-  let fetchdummy = (type, key, cb) => {
-    setTimeout(() => {
-      cb(dummyData[type] && dummyData[type][key] || null);
-    }, config.dummyTimeout || 100);
-  };
+  var prefix = (config.baseUrl || '').replace(/\/$/, '');
 
-  let HTTP = function HTTP(t, url, params, headers, loading) {
-    this.localDummy = config.dummy;
+  var HTTP = function HTTP(t, url, params, headers) {
+    var this$1 = this;
+
     this.url = url;
     this.id = url + '';
     this.type = t;
-    this.start = () => loading.start(this.id);
-    this.end = () => loading.end(this.id);
     this.http = new XMLHttpRequest();
     this.headers = Object.assign(config.headers || {}, headers || {});
     this.params = JSON.stringify(params);
-    this.resolve = () => {
-      this.end();
-    };
-    this.reject = e => {
+    this.reject = function (e) {
       console.error('[Radi Fetch] WARN: Request caught an error.\n', e);
-      this.end();
     };
 
-    let n = url.split('?').length - 1;
+    var n = url.split('?').length - 1;
     if (t === 'get')
-      for (let i in params) {
+      { for (var i in params) {
         url = url.concat(((!n)?'?':'&') + i + '=' + params[i]);
         n += 1;
-      }
+      } }
 
     this.http.open(t, prefix + url, true);
 
-    for (let h in this.headers) {
-      this.http.setRequestHeader(h, this.headers[h]);
+    for (var h in this$1.headers) {
+      this$1.http.setRequestHeader(h, this$1.headers[h]);
     }
 
     // Allows to abort request
-    this.abort = (...args) => this.http.abort(...args);
-    this.tag = key => (this.id = key, this);
-  };
+    this.abort = function () {
+      var ref;
 
-  HTTP.prototype.dummy = function (status = true) {
-    this.localDummy = status;
-    return this
+      var args = [], len = arguments.length;
+      while ( len-- ) args[ len ] = arguments[ len ];
+      return (ref = this$1.http).abort.apply(ref, args);
+    };
+    this.tag = function (key) { return (this$1.id = key, this$1); };
   };
 
   HTTP.prototype.catch = function (ERR) {
     if (typeof ERR === 'function') {
-      this.reject = (...args) => {
-        ERR(...args);
-        this.end();
+      this.reject = function () {
+        var args = [], len = arguments.length;
+        while ( len-- ) args[ len ] = arguments[ len ];
+
+        ERR.apply(void 0, args);
       };
     }
     return this
   };
 
   HTTP.prototype.then = function then(OK, ERR) {
-    this.start();
     if (typeof OK === 'function') {
-      this.resolve = (...args) => {
-        OK(...args);
-        this.end();
+      this.resolve = function () {
+        var args = [], len = arguments.length;
+        while ( len-- ) args[ len ] = arguments[ len ];
+
+        OK.apply(void 0, args);
       };
     }
     if (typeof ERR === 'function') {
-      this.reject = (...args) => {
-        ERR(...args);
-        this.end();
+      this.reject = function () {
+        var args = [], len = arguments.length;
+        while ( len-- ) args[ len ] = arguments[ len ];
+
+        ERR.apply(void 0, args);
       };
     }
-    if (this.localDummy || dummy) {
-      fetchdummy(this.type, this.url, data => {
-        this.resolve({
-          headers: '',
-          status: 'dummy',
-          response: JSON.stringify(data),
-          text: () => JSON.stringify(data),
-          json: () => data,
-        });
-      });
-      return this;
-    }
-    let self = this;
+    var self = this;
     this.http.onreadystatechange = function(e) {
-      let res = this;
+      var res = this;
       if (res.readyState === XMLHttpRequest.DONE) {
-        let h = {
+        var h = {
           headers: self.http.getAllResponseHeaders(),
           status: res.status,
           response: res.response
@@ -125,63 +102,101 @@ var index = ({
     return this
   };
 
-  class Fetch extends Component {
-    get(u, p, h) { return new HTTP('get', u, p, h, this.$loading) }
-    post(u, p, h) { return new HTTP('post', u, p, h, this.$loading) }
-    put(u, p, h) { return new HTTP('put', u, p, h, this.$loading) }
-    delete(u, p, h) { return new HTTP('delete', u, p, h, this.$loading) }
-    options(u, p, h) { return new HTTP('options', u, p, h, this.$loading) }
-    head(u, p, h) { return new HTTP('head', u, p, h, this.$loading) }
+  function applyLoading(subject, value) {
+    if (typeof subject === 'object') {
+      Object.defineProperty(subject, '$loading', {
+        value: value,
+        writable: true,
+      });
+    }
+    return subject;
   }
 
-  class Loading extends Component {
-    state() {
-      return {
-        $any: false,
-        $count: 0,
-      }
-    }
+  function Fetch(url, map, options) {
+    if ( map === void 0 ) map = function (e) { return e; };
+    if ( options === void 0 ) options = {};
 
-    start(key) {
-      if (this.state[key]) return false
-      this.setState({
-        [key]: true,
-        $count: this.state.$count + 1,
-        $any: !!(this.state.$count + 1),
-      });
-    }
+    var type = options.type; if ( type === void 0 ) type = 'get';
+    var retry = options.retry; if ( retry === void 0 ) retry = 0;
+    return function (params) { return function (update) {
+      new HTTP(type, url, params, h)
+        .then(function (data) {
+          update(applyLoading(map(data.json()), false));
+        })
+        .catch(function (err) {
+          if (options.retry > 0) {
+            Fetch(url, map, Object.assign({}, options, {retry: retry - 1}))(params)(update);
+          }
+        });
 
-    end(key) {
-      this.setState({
-        [key]: false,
-        $count: this.state.$count - 1,
-        $any: !!(this.state.$count - 1),
-      });
-    }
-
-    run(key, fn) {
-      if (this.state[key]) return false
-      this.start(key);
-
-      fn(cb => {
-        if (typeof cb === 'function') cb();
-        this.end(key);
-      });
-    }
+      return applyLoading({ $loading: true }, true);
+    }; };
   }
 
-  // Initiates loading component
-  headless('loading', Loading);
+  Fetch.http = function () {
+    var args = [], len = arguments.length;
+    while ( len-- ) args[ len ] = arguments[ len ];
 
-  // Initiates fetch component
-  headless('fetch', Fetch);
-
-  return {
-    config,
-    Fetch,
+    return new (Function.prototype.bind.apply( HTTP, [ null ].concat( args) ));
   };
+
+  Fetch.http.get = function () {
+    var args = [], len = arguments.length;
+    while ( len-- ) args[ len ] = arguments[ len ];
+
+    return new (Function.prototype.bind.apply( HTTP, [ null ].concat( ['get'], args) ));
+  };
+  Fetch.http.post = function () {
+    var args = [], len = arguments.length;
+    while ( len-- ) args[ len ] = arguments[ len ];
+
+    return new (Function.prototype.bind.apply( HTTP, [ null ].concat( ['post'], args) ));
+  };
+  Fetch.http.put = function () {
+    var args = [], len = arguments.length;
+    while ( len-- ) args[ len ] = arguments[ len ];
+
+    return new (Function.prototype.bind.apply( HTTP, [ null ].concat( ['put'], args) ));
+  };
+  Fetch.http.delete = function () {
+    var args = [], len = arguments.length;
+    while ( len-- ) args[ len ] = arguments[ len ];
+
+    return new (Function.prototype.bind.apply( HTTP, [ null ].concat( ['delete'], args) ));
+  };
+  Fetch.http.options = function () {
+    var args = [], len = arguments.length;
+    while ( len-- ) args[ len ] = arguments[ len ];
+
+    return new (Function.prototype.bind.apply( HTTP, [ null ].concat( ['options'], args) ));
+  };
+  Fetch.http.head = function () {
+    var args = [], len = arguments.length;
+    while ( len-- ) args[ len ] = arguments[ len ];
+
+    return new (Function.prototype.bind.apply( HTTP, [ null ].concat( ['head'], args) ));
+  };
+
+  Fetch.get = function (u, p, o) { return Fetch(u, p, Object.assign({}, o, {type: 'get'})); };
+  Fetch.post = function (u, p, o) { return Fetch(u, p, Object.assign({}, o, {type: 'post'})); };
+  Fetch.put = function (u, p, o) { return Fetch(u, p, Object.assign({}, o, {type: 'put'})); };
+  Fetch.delete = function (u, p, o) { return Fetch(u, p, Object.assign({}, o, {type: 'delete'})); };
+  Fetch.options = function (u, p, o) { return Fetch(u, p, Object.assign({}, o, {type: 'options'})); };
+  Fetch.head = function (u, p, o) { return Fetch(u, p, Object.assign({}, o, {type: 'head'})); };
+
+  Fetch.dummy = function (map, timeout) {
+      if ( map === void 0 ) map = function (e) { return e; };
+      if ( timeout === void 0 ) timeout = 0;
+
+      return function (params) { return function (update) { return (
+      setTimeout(update, timeout, applyLoading(map(params), false)), applyLoading({ $loading: true }, true)); }; };
+  };
+
+  return Fetch;
 };
 
-export default index;
+if (window) { window.RadiFetch = RadiFetch; }
+
+export default RadiFetch;
 export { version };
 //# sourceMappingURL=radi-fetch.es.js.map

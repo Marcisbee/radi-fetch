@@ -1,39 +1,18 @@
-export const version = '0.3.23';
+export const version = '0.5.0';
 
 // Pass config to initiate things
-export default ({
-    r,
-    l,
-    mount,
-    headless,
-    Component,
-  }, config = {}) => {
+const RadiFetch = (_radi, config = {}) => {
   let prefix = (config.baseUrl || '').replace(/\/$/, '');
-  let dummy = config.dummy;
-  let dummyData = config.dummyData || {};
 
-  let fetchdummy = (type, key, cb) => {
-    setTimeout(() => {
-      cb(dummyData[type] && dummyData[type][key] || null)
-    }, config.dummyTimeout || 100)
-  }
-
-  let HTTP = function HTTP(t, url, params, headers, loading) {
-    this.localDummy = config.dummy
+  let HTTP = function HTTP(t, url, params, headers) {
     this.url = url
     this.id = url + ''
     this.type = t
-    this.start = () => loading.start(this.id)
-    this.end = () => loading.end(this.id)
     this.http = new XMLHttpRequest()
     this.headers = Object.assign(config.headers || {}, headers || {})
     this.params = JSON.stringify(params)
-    this.resolve = () => {
-      this.end()
-    };
     this.reject = e => {
       console.error('[Radi Fetch] WARN: Request caught an error.\n', e);
-      this.end()
     };
 
     let n = url.split('?').length - 1
@@ -54,46 +33,25 @@ export default ({
     this.tag = key => (this.id = key, this)
   }
 
-  HTTP.prototype.dummy = function (status = true) {
-    this.localDummy = status;
-    return this
-  }
-
   HTTP.prototype.catch = function (ERR) {
     if (typeof ERR === 'function') {
       this.reject = (...args) => {
         ERR(...args)
-        this.end()
       };
     }
     return this
   }
 
   HTTP.prototype.then = function then(OK, ERR) {
-    this.start()
     if (typeof OK === 'function') {
       this.resolve = (...args) => {
         OK(...args)
-        this.end()
       };
     }
     if (typeof ERR === 'function') {
       this.reject = (...args) => {
         ERR(...args)
-        this.end()
       };
-    }
-    if (this.localDummy || dummy) {
-      fetchdummy(this.type, this.url, data => {
-        this.resolve({
-          headers: '',
-          status: 'dummy',
-          response: JSON.stringify(data),
-          text: () => JSON.stringify(data),
-          json: () => data,
-        });
-      })
-      return this;
     }
     let self = this
     this.http.onreadystatechange = function(e) {
@@ -125,59 +83,60 @@ export default ({
     return this
   }
 
-  class Fetch extends Component {
-    get(u, p, h) { return new HTTP('get', u, p, h, this.$loading) }
-    post(u, p, h) { return new HTTP('post', u, p, h, this.$loading) }
-    put(u, p, h) { return new HTTP('put', u, p, h, this.$loading) }
-    delete(u, p, h) { return new HTTP('delete', u, p, h, this.$loading) }
-    options(u, p, h) { return new HTTP('options', u, p, h, this.$loading) }
-    head(u, p, h) { return new HTTP('head', u, p, h, this.$loading) }
-  }
-
-  class Loading extends Component {
-    state() {
-      return {
-        $any: false,
-        $count: 0,
-      }
-    }
-
-    start(key) {
-      if (this.state[key]) return false
-      this.setState({
-        [key]: true,
-        $count: this.state.$count + 1,
-        $any: !!(this.state.$count + 1),
+  function applyLoading(subject, value) {
+    if (typeof subject === 'object') {
+      Object.defineProperty(subject, '$loading', {
+        value,
+        writable: true,
       });
     }
-
-    end(key) {
-      this.setState({
-        [key]: false,
-        $count: this.state.$count - 1,
-        $any: !!(this.state.$count - 1),
-      });
-    }
-
-    run(key, fn) {
-      if (this.state[key]) return false
-      this.start(key);
-
-      fn(cb => {
-        if (typeof cb === 'function') cb();
-        this.end(key);
-      })
-    }
+    return subject;
   }
 
-  // Initiates loading component
-  headless('loading', Loading);
+  function Fetch(url, map = e => e, options = {}) {
+    const {
+      type = 'get',
+      retry = 0,
+    } = options;
+    return (params) => (update) => {
+      new HTTP(type, url, params, h)
+        .then(data => {
+          update(applyLoading(map(data.json()), false));
+        })
+        .catch(err => {
+          if (options.retry > 0) {
+            Fetch(url, map, { ...options, retry: retry - 1 })(params)(update);
+          }
+        })
 
-  // Initiates fetch component
-  headless('fetch', Fetch);
+      return applyLoading({ $loading: true }, true);
+    };
+  }
 
-  return {
-    config,
-    Fetch,
-  };
+  Fetch.http = (...args) => new HTTP(...args);
+
+  Fetch.http.get = (...args) => new HTTP('get', ...args);
+  Fetch.http.post = (...args) => new HTTP('post', ...args);
+  Fetch.http.put = (...args) => new HTTP('put', ...args);
+  Fetch.http.delete = (...args) => new HTTP('delete', ...args);
+  Fetch.http.options = (...args) => new HTTP('options', ...args);
+  Fetch.http.head = (...args) => new HTTP('head', ...args);
+
+  Fetch.get = (u, p, o) => Fetch(u, p, { ...o, type: 'get' });
+  Fetch.post = (u, p, o) => Fetch(u, p, { ...o, type: 'post' });
+  Fetch.put = (u, p, o) => Fetch(u, p, { ...o, type: 'put' });
+  Fetch.delete = (u, p, o) => Fetch(u, p, { ...o, type: 'delete' });
+  Fetch.options = (u, p, o) => Fetch(u, p, { ...o, type: 'options' });
+  Fetch.head = (u, p, o) => Fetch(u, p, { ...o, type: 'head' });
+
+  Fetch.dummy = (map = e => e, timeout = 0) =>
+    (params) => (update) => (
+      setTimeout(update, timeout, applyLoading(map(params), false)),
+      applyLoading({ $loading: true }, true)
+    );
+
+  return Fetch;
 };
+
+if (window) window.RadiFetch = RadiFetch;
+export default RadiFetch;
